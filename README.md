@@ -10,8 +10,8 @@ BTSL was built to solve the fragility of imperative transaction building by enfo
 - **Workflow Chaining:** Formalizing multi-PSBT workflows via `DEPENDS_ON` and explicit outpoint binding.
 
 ## Documentation
-- **[Specification v1.1](./spec/btsl_spec_v1.1.md)**: Full EBNF grammar, runtime semantics, and security considerations.
-- **[Test Suite](./tests/test_vectors.md)**: Structural, logical, and cryptographic test vectors.
+- **[Specification v1.0](./spec/btsl-spec-v1.0.md)**: Full EBNF grammar, runtime semantics, test vectors, and security considerations.
+- **[Implementation Guide v1.0](./spec/btsl-implementation-guide-v1.0.md)**: Step‑by‑step compiler and validator reference.
 
 ## Playground: Scenarios of Experimentation
 The `/examples` folder contains "Scenario-based" schemas designed to test specific parts of the BTSL runtime:
@@ -21,21 +21,22 @@ The `/examples` folder contains "Scenario-based" schemas designed to test specif
 - `BRC20_DEPLOY.bts`: Data anchoring with `HEX_DATA` payloads.
 
 ## Implementation Checklist & Get Involved
-This project is an open proposal for formal transaction validation. If you are building tools for coordination, PSBT handling, or auditing, you are invited to use these `.bts` files to test your own implementations.
+This project defines **BTSL v1.0**, a proposed standard for formal PSBT construction and verification. If you are building tools for coordination, PSBT handling, or auditing, you are invited to:
 
-**Implementation Checklist:**
-- [ ] **Lexer/Parser:** INDENT/DEDENT handling + unit normalization (btc → sats).
-- [ ] **Runtime:** WCC estimation for `vSize()`, `REF()` on-chain resolution, and `SUM(INPUTS)` global logic.
-- [ ] **Binding:** Cryptographic validation of `scriptPubKey` vs roles.
-- [ ] **Error Handling:** Full implementation of `BTSL_ERR_01` through `07`.
+- Implement a BTSL engine following the **Specification v1.0** and the **Implementation Guide v1.0**.
+- Use the normative examples (§6) and test vectors (§7) in the specification as compliance targets.
+
+**Implementation Checklist (high level):**
+- [ ] **Lexer/Parser:** INDENT/DEDENT handling, reserved keywords, `.params` format, unit normalization (btc → sats).
+- [ ] **Runtime:** Canonical weight model for `vSize()`, `REF()` on-chain resolution, and `SUM(INPUTS)` / `SUM(OUTPUTS)` global logic.
+- [ ] **Binding:** Cryptographic validation of `scriptPubKey` vs anchored keys/scripts; `From(@PUBKEY) AS alias` resolver.
+- [ ] **Error Handling:** Full implementation of `BTSL_ERR_00` through `BTSL_ERR_09` (including `04a`–`04e`) and `BTSL_WARN_01` through `BTSL_WARN_08`.
 
 ## Security & Limitations
-BTSL assumes a Zero-Trust audit model. 
-- **Risk Note:** In the absence of `BIP118` (SIGHASH_ANYPREVOUT) or `BIP119` (CTV), there is no complete mitigation against `txid` mutation of a parent transaction via RBF. BTSL considers this structural risk as accepted and recommends using `nLocktime` (anchoring at block height) and CPFP for transaction chaining.
+BTSL assumes a Zero-Trust audit model.
+- **Residual Risk:** In the absence of `BIP118` (SIGHASH_ANYPREVOUT) or `BIP119` (CTV), there is no complete mitigation against `txid` mutation of a parent transaction via RBF. BTSL considers this structural risk as accepted and recommends using `nLocktime` (anchoring at block height) and CPFP for transaction chaining (see §5.1.3).
 
-> This is an **experimental prototype**, not a finished standard. I am stepping back from active Bitcoin development, so I am publishing these specs, grammar (EBNF), and test vectors as a foundation for anyone interested in experimenting with formal transaction validation.
-
-If you find this approach useful for your own work or implementations, please feel free to fork or adapt it.
+If you find this approach useful for your own work or implementations, please feel free to fork, implement, or adapt it. Contributions and reviews are welcome via issues and pull requests.
 
 ### License
 MIT License.
