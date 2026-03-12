@@ -13,12 +13,26 @@ BTSL was built to solve the fragility of imperative transaction building by enfo
 - **[Specification v1.0](./spec/btsl-spec-v1.0.md)**: Full EBNF grammar, runtime semantics, test vectors, and security considerations.
 - **[Implementation Guide v1.0](./spec/btsl-implementation-guide-v1.0.md)**: Step‑by‑step compiler and validator reference.
 
-## Playground: Scenarios of Experimentation
-The `/examples` folder contains "Scenario-based" schemas designed to test specific parts of the BTSL runtime:
-- `TRICOUNT.bts`: Shared settlement with multi-party fee balancing.
-- `MULTISIG.bts`: 2-of-2 multisig workflow and witness binding.
-- `VAULT.bts`: Time-locked vault with multi-PSBT chaînage and CSV enforcement.
-- `BRC20_DEPLOY.bts`: Data anchoring with `HEX_DATA` payloads.
+## Examples
+The `/examples` folder contains **normative** schemas and template `.params` files corresponding to §6 of the specification:
+- `tri-count-shared-payment/`:
+  - `schema.bts` — §6.1 `TRICOUNT` (shared payment with dynamic change and maker fee).
+  - `example.params` — template bindings for `@BOB_UTXO`, `@CARO_UTXO`, `@ALICE_ADDRESS`, etc.
+- `multisig-2-of-2/`:
+  - `schema.bts` — §6.2 2-of-2 multisig P2WSH with `<empty>` witness placeholder.
+  - `example.params` — template multisig UTXO, destination address, and keys.
+- `op-return-deploy/`:
+  - `schema.bts` — §6.3 OP_RETURN deploy with `HEX_DATA` payload.
+  - `example.params` — template funding UTXO, payload, and fee rate.
+- `timelocked-vault/`:
+  - `schema.bts` — §6.4 P2TR timelocked vault with `DEPENDS_ON` workflow.
+  - `example.params` — template funding UTXO, user address, keys, and fee rate.
+- `single-key-from-pubkey/`:
+  - `schema.bts` — §6.5 single-key spend using `From(@PUBKEY) AS alias`.
+  - `example.params` — template `Pubkey` and fee rate.
+
+All `example.params` files are **templates only**: they use obviously fake UTXOs and addresses.  
+Implementers MUST replace them with real testnet/regtest data before constructing or signing real PSBTs.
 
 ## Implementation Checklist & Get Involved
 This project defines **BTSL v1.0**, a proposed standard for formal PSBT construction and verification. If you are building tools for coordination, PSBT handling, or auditing, you are invited to:

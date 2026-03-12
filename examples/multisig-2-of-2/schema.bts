@@ -1,0 +1,35 @@
+VERSION: 1
+
+SCRIPT_DEFS:
+    MULTISIG_2_2 P2WSH:
+        asm: OP_2 <pubkey(PK1)> <pubkey(PK2)> OP_2 OP_CHECKMULTISIG
+
+PSBT_SCHEMA MULTISIG_SPEND:
+    PARAMS:
+        @MULTISIG_UTXO:UTXO
+        @DEST:ADDRESS
+        @FEE_RATE:FEERATE
+        @KEY1:HEX_DATA
+        @KEY2:HEX_DATA
+
+    INPUTS:
+        0: UNLOCK MULTISIG_2_2:
+            utxo: @MULTISIG_UTXO
+            witness_data:
+                ; OP_CHECKMULTISIG requires an OP_0 dummy as the first witness item
+                ; (BIP147 note: this empty element is mandatory for P2WSH)
+                DUMMY = <empty>
+                SIG1  = <SIGN_WITH(@KEY1)>
+                SIG2  = <SIGN_WITH(@KEY2)>
+
+    OUTPUTS:
+        0: @DEST 50000 sats
+        1: CHANGE @MULTISIG_UTXO.address change_amount sats
+
+    calc:
+        fees = vSize(CURRENT_PSBT) * @FEE_RATE
+        change_amount = REF(@MULTISIG_UTXO.amount) - 50000 - fees
+
+    ASSERT:
+        0: change_amount >= DUST_LIMIT
+

@@ -1,0 +1,29 @@
+VERSION: 1
+
+CONST:
+    DUST_LIMIT = 330
+
+PSBT_SCHEMA PUBKEY_SPEND:
+    CONST:
+        PAYMENT_ADDRESS = "bc1pw05kccyprc9uk0l32zaegva2rh68c6ra08n6zuhwzjsyapqhusss59usvt"
+        AMOUNT = 10000
+
+    PARAMS:
+        @PUBKEY:Pubkey
+        @FEE_RATE:FEERATE
+
+    INPUTS:
+        0: NATIVE P2WPKH
+            utxo: From(@PUBKEY) AS selected_utxo
+
+    OUTPUTS:
+        0: PAYMENT_ADDRESS AMOUNT sats
+        1: CHANGE selected_utxo.address change_amount sats
+
+    calc:
+        fees = vSize(CURRENT_PSBT) * @FEE_RATE
+        change_amount = selected_utxo.amount - AMOUNT - fees
+
+    ASSERT:
+        0: change_amount >= DUST_LIMIT
+

@@ -1,0 +1,74 @@
+VERSION: 1
+
+SCRIPT_DEFS:
+    VAULT_P2TR P2TR:
+        ; NUMS_KEY disables key-path spending.
+        ; The only valid spending path is unlock_path (timelocked).
+        ; A BTSL_WARN_05 would be emitted if a real key were used here.
+        internal_key: NUMS_KEY
+        paths:
+            unlock_path SCRIPT:
+                leaf_version: 192
+                witness:
+                    <sig(USER_SIG)>
+                asm: 100 OP_CSV OP_DROP <pubkey(USER_PK)> OP_CHECKSIG
+
+PSBT_SCHEMA VAULT_DEPOSIT:
+    PARAMS:
+        @FUNDING_UTXO:UTXO
+        @FEE_RATE:FEERATE
+        @KEY_PUB:HEX_DATA
+
+    INPUTS:
+        0: NATIVE P2WPKH
+            utxo: @FUNDING_UTXO
+
+    OUTPUTS:
+        0: SCRIPT VAULT_P2TR 100000 sats
+            script_params:
+                USER_PK = @KEY_PUB
+        1: CHANGE @FUNDING_UTXO.address change_amount sats
+
+    calc:
+        fees = vSize(CURRENT_PSBT) * @FEE_RATE
+        change_amount = REF(@FUNDING_UTXO.amount) - 100000 - fees
+
+    ASSERT:
+        0: change_amount >= DUST_LIMIT
+
+
+PSBT_SCHEMA VAULT_UNLOCK:
+    OPTIONS:
+        DEPENDS_ON VAULT_DEPOSIT
+
+    PARAMS:
+        @USER_ADDR:ADDRESS
+        @FEE_RATE:FEERATE
+        @USER_KEY:HEX_DATA
+        @KEY_PUB:HEX_DATA
+
+    INPUTS:
+        0: UNLOCK VAULT_P2TR USING unlock_path:
+            utxo: VAULT_DEPOSIT:0.txid:0
+            ; sequence: 100 encodes a BIP68 block-based relative timelock of 100 blocks.
+            ; The compiler MUST set PSBT_IN_SEQUENCE = 100 (0x00000064).
+            ; Bit 31 (disable flag) and bit 22 (time-based flag) MUST be clear.
+            ; See §9.5 for nSequence encoding normative rules.
+            sequence: 100
+            script_params:
+                USER_PK = @KEY_PUB
+            witness_data:
+                SIG1 = <SIGN_WITH(@USER_KEY)>
+
+    OUTPUTS:
+        0: @USER_ADDR final_payout sats
+
+    calc:
+        fees = vSize(CURRENT_PSBT) * @FEE_RATE
+        ; REF() forces an on-chain query to confirm the vault output value.
+        ; Using a bare workflow_ref here without REF() would trust the PSBT data.
+        final_payout = REF(VAULT_DEPOSIT:0.amount) - fees
+
+    ASSERT:
+        0: final_payout > DUST_LIMIT
+

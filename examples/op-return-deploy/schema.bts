@@ -1,0 +1,26 @@
+VERSION: 1
+
+CONST:
+    DUST_LIMIT = 546
+
+PSBT_SCHEMA OP_RETURN_DEPLOY:
+    PARAMS:
+        @USER:UTXO
+        @PAYLOAD:HEX_DATA
+        @FEE_RATE:FEERATE
+
+    INPUTS:
+        0: NATIVE P2WPKH
+            utxo: @USER
+
+    OUTPUTS:
+        0: OP_RETURN @PAYLOAD
+        1: CHANGE @USER.address change_amount sats
+
+    calc:
+        fees = vSize(CURRENT_PSBT) * @FEE_RATE
+        change_amount = REF(@USER.amount) - fees
+
+    ASSERT:
+        0: change_amount >= DUST_LIMIT
+
