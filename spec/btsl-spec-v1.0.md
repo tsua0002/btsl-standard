@@ -1,8 +1,11 @@
 # Bitcoin Transaction Schema Language (BTSL) — Specification v1.0
 
 **Status:** Reference Specification [DRAFT]
+
 **Date:** March 2026
-**Author:** TS
+
+**Author:** Thomas Suau
+
 **Scope:** PSBT Construction, Audit, and Workflow (BIP174/BIP370)
 
 ---
