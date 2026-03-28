@@ -9,11 +9,11 @@ PSBT_SCHEMA PUBKEY_SPEND:
         AMOUNT = 10000
 
     PARAMS:
-        @PUBKEY:Pubkey
+        @PUBKEY:PUBKEY
         @FEE_RATE:FEERATE
 
     INPUTS:
-        0: NATIVE P2WPKH
+        0: NATIVE P2TR
             utxo: From(@PUBKEY) AS selected_utxo
 
     OUTPUTS:

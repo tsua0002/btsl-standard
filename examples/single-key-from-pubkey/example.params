@@ -1,17 +1,5 @@
-# TEMPLATE ONLY — replace UTXOs, addresses and keys before signing
+# TEMPLATE - NOT SIGNABLE
 
-# For VAULT_DEPOSIT
-FUNDING_UTXO=0000000000000000000000000000000000000000000000000000000000000000:0
 FEE_RATE=2
-
-# Shared public key used in SCRIPT_DEFS (HEX_DATA, 33-byte compressed)
-KEY_PUB=0x0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2
-
-# For VAULT_UNLOCK
-USER_ADDR=tb1quser0000000000000000000000000000000000000
-
 # Signing key for USER_SIG path (HEX_DATA)
-USER_KEY=0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
-
-# FEE_RATE reused for unlock; you can override if desired
-# FEE_RATE=2
+PUBKEY=0283409659355b6d1cc3c32decd5d561abaac86c37a353b52895a5e6c196d6f448

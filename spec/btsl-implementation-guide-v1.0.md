@@ -263,7 +263,8 @@ function buildOutput(output_def, calc_results, params) {
     switch (output_def.type) {
 
         // ── Standard address output ─────────────────────────────────────
-        // address_ref may be a STRING, compile_ref, alias_ref, or IDENTIFIER.
+        // address_ref: STRING, compile_ref, alias_ref, PASCAL_CASE_ID, or
+        // IDENTIFIER (Formal Grammar in spec — lexer priority; bare snake_case_id invalid).
         // alias_ref (e.g. selected_utxo.address) resolves from the binding context.
         // amount may be a literal (sats) or a calc variable name.
         case "ADDRESS":
