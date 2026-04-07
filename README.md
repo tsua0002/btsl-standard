@@ -10,8 +10,9 @@ BTSL was built to solve the fragility of imperative transaction building by enfo
 - **Workflow Chaining:** Formalizing multi-PSBT workflows via `DEPENDS_ON` and explicit outpoint binding.
 
 ## Documentation
-- **[Specification v1.0](./spec/btsl-spec-v1.0.md)**: Full EBNF grammar, runtime semantics, test vectors, and security considerations.
+- **[Specification v1.0](./spec/btsl-spec-v1.0.md)** (Reference Specification [FINAL]): Full EBNF grammar, runtime semantics, test vectors, and security considerations.
 - **[Implementation Guide v1.0](./spec/btsl-implementation-guide-v1.0.md)**: Step‑by‑step compiler and validator reference.
+- **[Checker predicates (reference annex)](./spec/btsl-checker-predicates-v1.0.md)**: Consolidated S-1…A-5 predicate list and error mapping; **normative text** remains **§9.3.1** of the specification.
 
 ## Examples
 The `/examples` folder contains **normative** schemas and template `.params` files corresponding to §6 of the specification:
@@ -29,13 +30,13 @@ The `/examples` folder contains **normative** schemas and template `.params` fil
   - `example.params` — template funding UTXO, user address, keys, and fee rate.
 - `single-key-from-pubkey/`:
   - `schema.bts` — §6.5 single-key spend using `From(@PUBKEY) AS alias`.
-  - `example.params` — template `Pubkey` and fee rate.
+  - `example.params` — template `PUBKEY` and fee rate.
 
 All `example.params` files are **templates only**: they use obviously fake UTXOs and addresses.  
 Implementers MUST replace them with real testnet/regtest data before constructing or signing real PSBTs.
 
 ## Implementation Checklist & Get Involved
-This project defines **BTSL v1.0**, a proposed standard for formal PSBT construction and verification. If you are building tools for coordination, PSBT handling, or auditing, you are invited to:
+This project defines **BTSL v1.0** (**Reference Specification [FINAL]**), a community standard for formal PSBT construction and verification. If you are building tools for coordination, PSBT handling, or auditing, you are invited to:
 
 - Implement a BTSL engine following the **Specification v1.0** and the **Implementation Guide v1.0**.
 - Use the normative examples (§6) and test vectors (§7) in the specification as compliance targets.
@@ -44,7 +45,7 @@ This project defines **BTSL v1.0**, a proposed standard for formal PSBT construc
 - [ ] **Lexer/Parser:** INDENT/DEDENT handling, reserved keywords, `.params` format, unit normalization (btc → sats).
 - [ ] **Runtime:** Canonical weight model for `vSize()`, `REF()` on-chain resolution, and `SUM(INPUTS)` / `SUM(OUTPUTS)` global logic.
 - [ ] **Binding:** Cryptographic validation of `scriptPubKey` vs anchored keys/scripts; `From(@PUBKEY) AS alias` resolver.
-- [ ] **Error Handling:** Full implementation of `BTSL_ERR_00` through `BTSL_ERR_09` (including `04a`–`04e`) and `BTSL_WARN_01` through `BTSL_WARN_08`.
+- [ ] **Error Handling:** Full implementation of `BTSL_ERR_00` through `BTSL_ERR_13` (including `04a`–`04e`) and `BTSL_WARN_01` through `BTSL_WARN_09`.
 
 ## Security & Limitations
 BTSL assumes a Zero-Trust audit model.

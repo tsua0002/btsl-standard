@@ -37,5 +37,5 @@ PSBT_SCHEMA MULTISIG_SPEND:
  
 
     ASSERT:
-        0: change_amount >= @DUST_LIMIT
+        0: change_amount >= DUST_LIMIT
 

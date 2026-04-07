@@ -45,7 +45,7 @@ The compiler parses the `.bts` file and extracts all declared `@PARAMS`.
 - Untyped `@PARAM` → `BTSL_WARN_03` (Flexible Mode).
 - `btc` values normalized to `sats` (× 100,000,000) at this stage. All subsequent
   operations are performed exclusively on `SAT` integers.
-- `@PARAM:Pubkey` values MUST be validated as 33-byte compressed secp256k1 public
+- `@PARAM:PUBKEY` values MUST be validated as 33-byte compressed secp256k1 public
   keys (prefix `0x02` or `0x03`). Invalid value → `BTSL_ERR_04e`.
 
 #### `From()` Resolver (Binding-Phase UTXO Resolution)
@@ -53,7 +53,7 @@ The compiler parses the `.bts` file and extracts all declared `@PARAMS`.
 When an input declares `utxo: From(@PUBKEY) AS alias`, the resolver executes at
 bind time (step 2 of the normative pipeline, §3.4) — before `calc` or `REF()`.
 
-1. **Validate** that `@PUBKEY` is declared as `@X:Pubkey` in `PARAMS:`. Any other
+1. **Validate** that `@PUBKEY` is declared as `@X:PUBKEY` in `PARAMS:`. Any other
    type → `BTSL_ERR_04e`.
 2. **Derive the address** from the public key:
    - If the input declares `native_input_type` (e.g., `NATIVE P2WPKH`), derive
@@ -356,11 +356,20 @@ by the schema.
 
 ---
 
-### Step 2.2 — Zero-Trust UTXO Restoration (Anti-Fraud Step)
+### Step 2.2 — Shape, Zero-Trust Prevouts, and Input Structure
 
-This is the critical security step that defends against a malicious coordinator.
+This step aligns with **§9.3.1**: **S-1**/**S-2** (shape) MUST run before any other Checker predicate; if shape fails, the Checker MUST halt (**fast-fail**).
 
-For **each input** in the decoded PSBT:
+#### 2.2.1 Shape predicates (S-1 / S-2)
+
+- Number of PSBT inputs MUST match the schema `INPUTS` count — else `BTSL_ERR_13` (`SCHEMA_MISMATCH`).
+- Number of PSBT outputs MUST match the schema `OUTPUTS` count — else `BTSL_ERR_13` (`SCHEMA_MISMATCH`).
+
+If either check fails, the Checker MUST stop; do not run per-input chain queries, `calc` replay, or **ASSERT**.
+
+#### 2.2.2 Zero-trust UTXO restoration (I-3)
+
+This defends against a malicious coordinator. For **each input** in the decoded PSBT:
 
 1. Extract `txid:vout`.
 2. Query the indexer independently:
@@ -371,7 +380,7 @@ For **each input** in the decoded PSBT:
    the PSBT with the fetched `Blockchain_Value`. The PSBT-declared value MUST be
    treated as untrusted.
 4. **Strict validation:** `PSBT_IN_VALUE == Blockchain_Value`. Any discrepancy
-   is fatal — reject immediately.
+   → `BTSL_ERR_11` (`PREVOUT_VALUE_MISMATCH`) — reject immediately.
 
 > **Why this matters:** A malicious coordinator could declare a lower UTXO value in
 > the PSBT's `witness_utxo` field, causing the fee calculation to be underestimated.
@@ -384,12 +393,11 @@ Checker MUST load this persisted binding and verify the UTXO against the on-chai
 indexer using the same Zero-Trust rule above. The Checker does NOT re-execute the
 `From()` selection — it validates the specific UTXO that was bound (§4.5.5).
 
-Structural checks (also in this step):
-- Number of PSBT inputs matches `INPUTS` section count.
-- Number of PSBT outputs matches `OUTPUTS` section count.
-- Each input `scriptPubKey` matches the declared type (NATIVE or UNLOCK).
-- Mismatch → `BTSL_ERR_01`.
+#### 2.2.3 Input `scriptPubKey` and binding (I-1 / I-2 as applicable)
+
+- Each input `scriptPubKey` (from chain) MUST match the declared type (`NATIVE` or `UNLOCK`) → `BTSL_ERR_01` / `BTSL_ERR_02` as in **§9.3.1**.
 - Anchored pubkey/script mismatch → `BTSL_ERR_02`.
+- Outpoint vs parameters / workflow parent (**I-2**): see **§9.3.1** and **§9.4** (`BTSL_ERR_12`, `BTSL_ERR_05`).
 
 ---
 
@@ -397,7 +405,7 @@ Structural checks (also in this step):
 
 Re-execute the `calc` engine using:
 - Parameters from `instance.params` (same as Maker).
-- UTXO amounts from the certified on-chain values obtained in Step 2.2 (not from PSBT).
+- UTXO amounts from the certified on-chain values obtained in **Step 2.2.2** (not from PSBT).
 
 Store all resulting variables (`fees`, `change_amount`, `final_payout`, etc.).
 
@@ -405,30 +413,39 @@ Store all resulting variables (`fees`, `change_amount`, `final_payout`, etc.).
 
 ### Step 2.4 — Cross-Validation and ASSERT
 
-1. **Output amount cross-check:** For each output in the PSBT, compare the declared
-   amount against the corresponding `calc` variable or literal in the schema.
-   Any divergence is treated as an `ASSERT` failure → `BTSL_ERR_06`.
+1. **Output scriptPubKey cross-check (O-1):** For each output `j` in the PSBT,
+   verify that `P.outputs[j].scriptPubKey` matches the script derived from the
+   schema output definition:
+   - `ADDRESS` / `CHANGE` → resolved address converted to scriptPubKey.
+   - `SCRIPT` → derived from `SCRIPT_DEFS` and `script_params`.
+   - `OP_RETURN` → built from the resolved hex payload.
+   Any mismatch → `BTSL_ERR_02` (`BINDING_FAILURE`). See spec §9.3.1 predicate O-1.
 
-2. **ASSERT execution:** Evaluate all `ASSERT` clauses in numerical order using
+2. **Output amount cross-check (O-2):** For each output in the PSBT, compare the
+   declared amount against the corresponding `calc` variable or literal in the schema
+   (`OP_RETURN` outputs MUST be `0`).
+   Any divergence → `BTSL_ERR_06`.
+
+3. **ASSERT execution:** Evaluate all `ASSERT` clauses in numerical order using
    the replayed `calc` variables. All clauses MUST be evaluated.
    Any `false` → `BTSL_ERR_06`.
 
-3. **Implicit balance check** (if `fees` variable exists in `calc`):
+4. **Implicit balance check** (if `fees` variable exists in `calc`):
    ```
    SUM(INPUTS_onchain) == SUM(OUTPUTS_PSBT) + fees_calc
    ```
    Violation → `BTSL_ERR_06`. If `fees` is absent → `BTSL_WARN_06` (check skipped).
 
-4. **Dust check:** Any standard or `SCRIPT` output `< DUST_LIMIT` → `BTSL_ERR_07`.
+5. **Dust check:** Any standard or `SCRIPT` output `< DUST_LIMIT` → `BTSL_ERR_07`.
 
-5. **Weight check:** If `tx_weight > 400,000 wu` → `BTSL_WARN_07`.
+6. **Weight check:** If `tx_weight > 400,000 wu` → `BTSL_WARN_07`.
 
 ---
 
 ### Step 2.5 — Signature Authorization
 
 ```javascript
-if (step22_passed && step23_passed && step24_passed) {
+if (shapeAndFieldLevelPassed && step23Passed && step24Passed) {
     // All checks passed — signing is authorized
     psbt.signInput(index, keyPair);   // wallet/HSM operation
     return { status: "AUTHORIZED" };
@@ -537,19 +554,23 @@ Implementations MUST produce these exact values:
 | Code | Name | Cause |
 |:---|:---|:---|
 | `BTSL_ERR_00` | `SYNTAX_ERROR` | Unparsable file: mixed indentation, missing `VERSION`, missing mandatory section, duplicate section. |
-| `BTSL_ERR_01` | `TYPE_MISMATCH` | UTXO `scriptPubKey` does not match declared type (`NATIVE` or `UNLOCK`). Also raised if `sequence:` value is inconsistent with `OP_CSV` operand. |
-| `BTSL_ERR_02` | `BINDING_FAILURE` | UTXO `scriptPubKey` does not match anchored `pubkey`/`script`. |
+| `BTSL_ERR_01` | `TYPE_MISMATCH` | UTXO `scriptPubKey` does not match declared type (`NATIVE` or `UNLOCK`). PSBT `nSequence` does not match schema `sequence:` or is inconsistent with `OP_CSV` (§9.5). Compiler: `sequence:` vs `asm:` mismatch. |
+| `BTSL_ERR_02` | `BINDING_FAILURE` | (a) Input: UTXO `scriptPubKey` does not match anchored `pubkey`/`script`. (b) Output: PSBT output `scriptPubKey` does not match the script derived from the schema output definition (predicate O-1). |
 | `BTSL_ERR_03` | `CIRCULAR_DEPENDENCY` | Mutual `DEPENDS_ON` detected. |
 | `BTSL_ERR_04a` | `INVALID_DERIVED_FIELD` | Manual input of a compiler-computed field (e.g., `control_block`). |
 | `BTSL_ERR_04b` | `UNDECLARED_PARAM` | `@PARAM` referenced but not declared, or declared but unresolved. |
 | `BTSL_ERR_04c` | `INVALID_SCRIPT_TYPE` | `.script_type` resolved to an unrecognized value, or unrecognized input/output type. |
 | `BTSL_ERR_04d` | `FORWARD_REFERENCE_IN_CALC` | A `calc` variable references another `calc` variable not yet declared. |
-| `BTSL_ERR_04e` | `INVALID_PUBKEY_PARAM` | A `Pubkey`-typed `@PARAM` received an invalid value (not 33-byte compressed key with prefix `0x02`/`0x03`), or `From()` was invoked on a `@PARAM` not declared as `Pubkey`. |
+| `BTSL_ERR_04e` | `INVALID_PUBKEY_PARAM` | A `PUBKEY`-typed `@PARAM` received an invalid value (not 33-byte compressed key with prefix `0x02`/`0x03`), or `From()` was invoked on a `@PARAM` not declared as `PUBKEY`. |
 | `BTSL_ERR_05` | `UNRESOLVED_DEPENDENCY` | `REF()` or `SUM()` called on an unresolved or unbroadcast dependency. |
-| `BTSL_ERR_06` | `ASSERT_FAILURE` | An `ASSERT` condition is false, or the implicit balance invariant is violated. |
+| `BTSL_ERR_06` | `ASSERT_FAILURE` | An `ASSERT` condition is false; the implicit balance invariant is violated; or a PSBT output amount does not match the value expected from `calc` / schema (**O-2**). |
 | `BTSL_ERR_07` | `DUST_OUTPUT` | Output amount below `DUST_LIMIT` (546 sats default). |
 | `BTSL_ERR_08` | `ARITHMETIC_ERROR` | Division by zero, integer overflow, or negative `SAT` result. |
-| `BTSL_ERR_09` | `UTXO_RESOLUTION_FAILURE` | `From()` could not find any confirmed UTXO for the derived address of the given `Pubkey`. |
+| `BTSL_ERR_09` | `UTXO_RESOLUTION_FAILURE` | `From()` could not find any confirmed UTXO for the derived address of the given `PUBKEY`. |
+| `BTSL_ERR_10` | `WITNESS_BINDING_MISMATCH` | A `witness_data` identifier does not match any placeholder in the referenced `witness:` block, a placeholder has no corresponding entry, or the declaration order differs. |
+| `BTSL_ERR_11` | `PREVOUT_VALUE_MISMATCH` | PSBT-declared input amount does not match the independently fetched on-chain value for that outpoint. Zero-trust validation failed (predicate I-3). |
+| `BTSL_ERR_12` | `OUTPOINT_MISMATCH` | PSBT input `txid:vout` does not match the outpoint bound in parameters (I-2 Case A) or the confirmed parent broadcast outpoint (I-2 Case C, §9.4). |
+| `BTSL_ERR_13` | `SCHEMA_MISMATCH` | PSBT input or output count does not match the schema declaration. Fast-fail: the Checker MUST halt; no further predicate is evaluated. |
 
 ### Warning Codes
 
@@ -563,4 +584,5 @@ Implementations MUST produce these exact values:
 | `BTSL_WARN_06` | `MISSING_FEES_DECLARATION` | No `calc` variable named `fees`. Implicit balance check is skipped. |
 | `BTSL_WARN_07` | `EXCEEDS_STANDARD_WEIGHT` | `tx_weight` > 400,000 wu. Transaction will likely be rejected by standard relay policy. |
 | `BTSL_WARN_08` | `INFERRED_PUBKEY_TYPE` | `From()` used without `native_input_type`. Address type inferred as P2TR by default. Declare `NATIVE` explicitly for deterministic type binding. |
+| `BTSL_WARN_09` | `CONST_SHADOWING` | A local `CONST` declaration shadows a global `CONST` identifier of the same name. |
 

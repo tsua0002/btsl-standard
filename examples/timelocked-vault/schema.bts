@@ -58,7 +58,7 @@ PSBT_SCHEMA VAULT_UNLOCK:
             script_params:
                 USER_PK = @KEY_PUB
             witness_data:
-                SIG1 = <SIGN_WITH(@USER_KEY)>
+                USER_SIG = <SIGN_WITH(@USER_KEY)>
 
     OUTPUTS:
         0: @USER_ADDR final_payout sats

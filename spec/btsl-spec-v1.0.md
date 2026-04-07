@@ -1,8 +1,8 @@
 # Bitcoin Transaction Schema Language (BTSL) — Specification v1.0
 
-**Status:** Reference Specification [DRAFT]
+**Status:** Reference Specification [FINAL]
 
-**Date:** March 2026
+**Date:** April 2026
 
 **Author:** Thomas Suau
 
@@ -13,8 +13,8 @@
 > This document represents the state of the original author's work, who
 > is no longer available to maintain it. It is published as-is in the
 > hope that it can be continued by the community.
-> Sections marked `[OPEN]` explicitly identify unresolved points.
-> Future maintainers are invited to open discussions on those matters.
+> Non-normative future-work material is labeled **(Informative)** (§9.7).
+> Errata and proposed changes should be tracked via the project repository (issues / pull requests).
 
 ---
 
@@ -140,7 +140,7 @@ BOOLEAN             ::= "true" | "false"
 (*   OP_RETURN OP_CSV OP_CHECKSIG OP_CHECKMULTISIG OP_DROP          *)
 (*   P2TR P2WSH P2SH P2WPKH P2PKH P2TR_KEY                         *)
 (*   UTXO ADDRESS FEERATE HEX_DATA SATOSHI BOOLEAN                  *)
-(*   Pubkey From                                                     *)
+(*   PUBKEY From                                                     *)
 (*   true false                                                      *)
 (* ================================================================ *)
 
@@ -175,7 +175,7 @@ const_assignment    ::= IDENTIFIER, "=", value
 
 params_section      ::= "PARAMS", SECTION_OPEN, { param_declaration, NL }+, DEDENT
 param_declaration   ::= "@", PASCAL_CASE_ID,
-                        [ COLON, ("UTXO" | "ADDRESS" | "FEERATE" | "HEX_DATA" | "SATOSHI" | "Pubkey") ]
+                        [ COLON, ("UTXO" | "ADDRESS" | "FEERATE" | "HEX_DATA" | "SATOSHI" | "PUBKEY") ]
 
 options_section     ::= "OPTIONS", SECTION_OPEN,
                             { option_assignment, NL }*,
@@ -277,7 +277,7 @@ input_source        ::= simple_input_block | unlock_block
 
 simple_input_block  ::= NL, INDENT, "utxo", COLON, (reference | utxo_resolver), NL, DEDENT
 
-(* utxo_resolver: auto-selects a UTXO from a Pubkey @PARAM.          *)
+(* utxo_resolver: auto-selects a UTXO from a PUBKEY @PARAM.          *)
 (* The AS alias is MANDATORY — omitting it is BTSL_ERR_00.            *)
 (* It exposes alias.amount in calc and alias.address in OUTPUTS.      *)
 (* Selection strategy: largest confirmed UTXO (largest-first).        *)
@@ -648,15 +648,15 @@ control_block_weight(depth) = 1 + 33 + (32 × depth)   (* = 34 + 32×depth wu *)
 | `FEERATE`  | Fee rate                         | In `sat/vByte`                                                     |
 | `HEX_DATA` | Arbitrary binary data            | —                                                                  |
 | `SATOSHI`  | Explicit alias of `SAT` for `@PARAMS` | ≥ 0                                                          |
-| `Pubkey`   | Compressed secp256k1 public key (33 bytes) | —                                                    |
+| `PUBKEY`   | Compressed secp256k1 public key (33 bytes) | —                                                    |
 
 > The `.script_type` property of a `UTXO` MUST resolve to one of the following string
 > literals: `"P2PKH"`, `"P2WPKH"`, `"P2TR"`, `"P2WSH"`, `"P2SH"`. Any other value
 > raises `BTSL_ERR_04c`.
 
-> A `Pubkey` value in the `.params` file MUST be a 33-byte compressed hex string
+> A `PUBKEY` value in the `.params` file MUST be a 33-byte compressed hex string
 > (prefix `0x02` or `0x03`). Any other value raises `BTSL_ERR_04e`. Address derivation
-> from `Pubkey` is performed by `From()` at bind time (§4.5).
+> from `PUBKEY` is performed by `From()` at bind time (§4.5).
 
 > All listed properties are **normative** for the `UTXO` type. A compiler MUST resolve
 > them if referenced. A missing or unresolvable property raises `BTSL_ERR_04b`.
@@ -759,7 +759,7 @@ three sequential phases: **Binding**, **Calculation**, and **Validation**.
 | `NUMS_KEY`      | Constant  | The standard NUMS secp256k1 point (BIP341 §Appendix A). Disables key-path spending when used as `internal_key`. See §3.7. |
 | `CHANGE`        | Keyword   | Marks an output as the change output. **Semantics:** (1) The compiler MUST include this output in `SUM(OUTPUTS)` for the balance check. (2) The `amount` argument MUST be a `snake_case_id` variable resolved from `calc` — a literal integer is NOT permitted. This requirement ensures the change amount is auditable and not hardcoded. |
 | `Amount`        | Type Rule | Any value declared with the `btc` unit suffix is normalized to `sats` (× 100,000,000) at parse time. An `amount` field without an explicit unit suffix is treated as `sats`. All `calc` and `ASSERT` operations are executed exclusively in `sats`. |
-| `From(@PUBKEY) AS alias` | Resolver | Resolves one UTXO from a `Pubkey`-typed `@PARAM` during the **Binding** phase (step 2 of the pipeline, §3.4). Derives the address from `@PUBKEY` using the type declared by `native_input_type` on the input (`NATIVE P2WPKH`, `NATIVE P2PKH`, etc.), or Taproot key-path (P2TR) by default. Performs an indexer list-query to enumerate confirmed UTXOs for the derived address and selects the **largest by amount** (largest-first). The selected UTXO is bound under `alias` in the binding context: `alias.amount` is accessible in `calc` as a `SAT` integer; `alias.address` is accepted as an `address_ref` in `OUTPUTS`. If no confirmed UTXO is found → `BTSL_ERR_09`. If `native_input_type` is absent → `BTSL_WARN_08`. The alias is **mandatory** — omitting `AS alias` → `BTSL_ERR_00`. See §4.5. |
+| `From(@PUBKEY) AS alias` | Resolver | Resolves one UTXO from a `PUBKEY`-typed `@PARAM` during the **Binding** phase (step 2 of the pipeline, §3.4). Derives the address from `@PUBKEY` using the type declared by `native_input_type` on the input (`NATIVE P2WPKH`, `NATIVE P2PKH`, etc.), or Taproot key-path (P2TR) by default. Performs an indexer list-query to enumerate confirmed UTXOs for the derived address and selects the **largest by amount** (largest-first). The selected UTXO is bound under `alias` in the binding context: `alias.amount` is accessible in `calc` as a `SAT` integer; `alias.address` is accepted as an `address_ref` in `OUTPUTS`. If no confirmed UTXO is found → `BTSL_ERR_09`. If `native_input_type` is absent → `BTSL_WARN_08`. The alias is **mandatory** — omitting `AS alias` → `BTSL_ERR_00`. See §4.5. |
 
 ---
 
@@ -789,9 +789,9 @@ consistency of multi-PSBT workflows:
    query. Use `REF(workflow_ref)` when the live on-chain value must be verified.
 
 > **Security implication:** In the Audit & Signature Workflow (§9.3), the Checker MUST
-> use `REF()` to re-fetch all UTXO values from the chain. Values declared in
+> re-fetch UTXO values from the chain (see `REF()` usage in §4.2 and §9.3). Values declared in
 > `witness_utxo` / `non_witness_utxo` by the coordinator MUST be treated as untrusted
-> until confirmed against `Blockchain_Value`.
+> until confirmed against `Blockchain_Value`. A mismatch → `BTSL_ERR_11` (§5.3, §9.3.1 **I-3**).
 
 ---
 
@@ -807,7 +807,7 @@ consistency of multi-PSBT workflows:
 
 > **`From()` Resolver:** When an input declares `utxo: From(@PUBKEY) AS alias`, the
 > resolver executes during the Binding phase (step 2, §3.4), before `calc`. The
-> compiler MUST treat `@PUBKEY` as a `Pubkey`-typed `@PARAM` and derive the address
+> compiler MUST treat `@PUBKEY` as a `PUBKEY`-typed `@PARAM` and derive the address
 > according to the `native_input_type` hint on the input: if present (`NATIVE P2WPKH`,
 > `NATIVE P2PKH`, etc.), that type determines the address encoding; if absent, the
 > compiler MUST derive a P2TR key-path address by default and emit `BTSL_WARN_08`. The
@@ -891,7 +891,7 @@ BTSL distinguishes between two logical roles to guarantee integrity:
 
 ### 4.5.1. Purpose
 
-`From(@PUBKEY) AS alias` resolves a live UTXO from a `Pubkey` parameter without
+`From(@PUBKEY) AS alias` resolves a live UTXO from a `PUBKEY` parameter without
 requiring the schema author to specify a `txid:vout` manually. It is the ergonomic
 bridge between a public key identity and a spendable UTXO.
 
@@ -904,7 +904,7 @@ pipeline steps.
 
 ### 4.5.3. Address Derivation
 
-The compiler derives the address to query from the `Pubkey` value according to
+The compiler derives the address to query from the `PUBKEY` value according to
 the following rules:
 
 1. If `native_input_type` is declared on the input (`NATIVE P2WPKH`,
@@ -944,13 +944,17 @@ production in the grammar (§2). No other properties are exposed.
 
 ### 4.5.6. Constraints
 
-- The `@PARAM` passed to `From()` MUST be declared as `@X:Pubkey` in the
+- The `@PARAM` passed to `From()` MUST be declared as `@X:PUBKEY` in the
   `PARAMS:` section and MUST NOT include a property suffix (no `.amount`,
   `.txid`, etc.). Any other type or malformed value raises `BTSL_ERR_04e`.
 - The `AS alias` clause is **mandatory**. Omitting it is a syntax error
   (`BTSL_ERR_00`).
 - `From()` is only valid in a `simple_input_block` (`utxo:` field). Its use in
   an `unlock_block`, in `calc`, or in `ASSERT` is a syntax error (`BTSL_ERR_00`).
+
+### 4.5.7. Export to an external Checker
+
+When the constructed PSBT is passed to a Checker **outside** the Maker process, the Maker **MUST** persist `From()` results in accordance with **§9.1.1 Level&nbsp;1** so the Checker can enforce **I-2 Case A** (strict `txid`/`vout` agreement with the agreed binding).
 
 ---
 
@@ -981,12 +985,12 @@ The BTSL protocol delegates UI management to the wallet.
   proofs of possession (private keys) will fail to validate the `scriptPubKey` of the
   opposing UTXOs. **This is a business logic error, not a protocol flaw.**
 
-### 5.1.3. Residual Risk (RBF / Txid Malleability) [OPEN]
+### 5.1.3. Residual Risk (RBF / Txid Malleability)
 
 **Note:** In the absence of `SIGHASH_ANYPREVOUT` (BIP118) or `OP_CHECKTEMPLATEVERIFY`
 (BIP119), there is no complete mitigation against the mutation of a parent transaction's
 `txid` via RBF (Replace-By-Fee). The BTSL protocol considers this a **structural,
-accepted risk** and makes the following normative recommendations for dependent
+accepted risk** under v1.0 and makes the following **normative recommendations** for dependent
 transactions:
 
 - Use `nLocktime` set to the current block height to create a temporal anchor.
@@ -1045,21 +1049,24 @@ Compilation MAY proceed **only if** all mandatory sections (`VERSION`, `INPUTS`,
 
 | Code           | Name                     | Cause                                                                                       |
 | :------------- | :----------------------- | :------------------------------------------------------------------------------------------ |
-| `BTSL_ERR_00`  | `SYNTAX_ERROR`           | Unparsable file: mixed indentation, missing `VERSION`, missing mandatory section, duplicate section. |
-| `BTSL_ERR_01`  | `TYPE_MISMATCH`          | The injected UTXO does not match the declared type (`NATIVE` or `UNLOCK`).                 |
-| `BTSL_ERR_02`  | `BINDING_FAILURE`        | The UTXO `scriptPubKey` does not match the `pubkey`/`script` anchored to the role.         |
+| `BTSL_ERR_00`  | `SYNTAX_ERROR`           | The `.bts` schema file is unparsable or structurally invalid at parse time (e.g. mixed indentation, missing `VERSION`, missing mandatory section, duplicate section). Does **not** apply to PSBT-vs-schema shape checks on the Checker side (see `BTSL_ERR_13`). |
+| `BTSL_ERR_01`  | `TYPE_MISMATCH`          | The injected UTXO does not match the declared input type (`NATIVE` or `UNLOCK`) — Checker predicate **I-1**; or the PSBT input `nSequence` does not match the schema `sequence:` or is inconsistent with the `OP_CSV` operand (§9.5) — Checker predicate **I-4**. |
+| `BTSL_ERR_02`  | `BINDING_FAILURE`        | Input: the UTXO `scriptPubKey` does not match the `pubkey`/`script` anchored to the role (**I-1** in constrained mode). Output: the PSBT output `scriptPubKey` does not match the script derived from the schema definition (address, `SCRIPT`, or `OP_RETURN`) — Checker predicate **O-1**. |
 | `BTSL_ERR_03`  | `CIRCULAR_DEPENDENCY`    | Mutual `DEPENDS_ON` detected (e.g., `A DEPENDS_ON B`, `B DEPENDS_ON A`).                   |
 | `BTSL_ERR_04a` | `INVALID_DERIVED_FIELD`  | Manual input of a compiler-computed field (e.g., `control_block`).                         |
 | `BTSL_ERR_04b` | `UNDECLARED_PARAM`       | Reference to a `@PARAM` not declared in the `PARAMS` section.                              |
 | `BTSL_ERR_04c` | `INVALID_SCRIPT_TYPE`    | The `.script_type` property resolved to an unrecognized value.                             |
 | `BTSL_ERR_04d` | `FORWARD_REFERENCE_IN_CALC` | A `calc` variable references another `calc` variable not yet declared in declaration order. |
-| `BTSL_ERR_04e` | `INVALID_PUBKEY_PARAM`   | A `Pubkey`-typed `@PARAM` received a value that is not a valid 33-byte compressed secp256k1 public key (prefix `0x02` or `0x03`), or `From()` was invoked on a `@PARAM` not declared as `Pubkey`. |
-| `BTSL_ERR_05`  | `UNRESOLVED_DEPENDENCY`  | `SUM()` or `REF()` called on an unresolved dependency (unbroadcast parent TX, or unfetched UTXO). |
-| `BTSL_ERR_06`  | `ASSERT_FAILURE`         | An `ASSERT` condition evaluated to false, or the implicit balance invariant `SUM(INPUTS) != SUM(OUTPUTS) + fees` was violated. |
+| `BTSL_ERR_04e` | `INVALID_PUBKEY_PARAM`   | A `PUBKEY`-typed `@PARAM` received a value that is not a valid 33-byte compressed secp256k1 public key (prefix `0x02` or `0x03`), or `From()` was invoked on a `@PARAM` not declared as `PUBKEY`. |
+| `BTSL_ERR_05`  | `UNRESOLVED_DEPENDENCY`  | `SUM()` or `REF()` called on an unresolved dependency (unbroadcast parent TX, or unfetched UTXO). Checker **I-2 Case C** when the workflow parent transaction is not available to verify the spent outpoint. |
+| `BTSL_ERR_06`  | `ASSERT_FAILURE`         | Checker: an `ASSERT` condition evaluated to false; the implicit balance invariant `SUM(INPUTS) != SUM(OUTPUTS) + fees` was violated (**A-2**, **A-3**); or a PSBT output amount does not match the value expected from **calc** / schema (**O-2**). |
 | `BTSL_ERR_07`  | `DUST_OUTPUT`            | Amount of a standard or `SCRIPT` output is below `DUST_LIMIT`.                             |
 | `BTSL_ERR_08`  | `ARITHMETIC_ERROR`       | Runtime exception: division by zero, integer overflow, or a `SAT` value resolved to a negative integer. |
-| `BTSL_ERR_09`  | `UTXO_RESOLUTION_FAILURE` | `From()` could not find any confirmed UTXO for the derived address of the given `Pubkey`. |
+| `BTSL_ERR_09`  | `UTXO_RESOLUTION_FAILURE` | `From()` could not find any confirmed UTXO for the derived address of the given `PUBKEY`. |
 | `BTSL_ERR_10`  | `WITNESS_BINDING_MISMATCH` | A `witness_data` identifier does not match any placeholder name in the referenced `witness:` block, a placeholder has no corresponding `witness_data` entry, or the declaration order differs (P2TR paths with `witness:` only; see §2). |
+| `BTSL_ERR_11`  | `PREVOUT_VALUE_MISMATCH` | Checker zero-trust step: the PSBT-declared input amount (`witnessUtxo` value or amount extracted from `non_witness_utxo`) does not match the independently fetched on-chain value for that `txid:vout` — predicate **I-3** (§9.3.1). |
+| `BTSL_ERR_12`  | `OUTPOINT_MISMATCH`      | Checker predicate **I-2 Case A**: the PSBT input `txid`/`vout` does not match the outpoint bound in parameters for that input (coordinator may have substituted a different UTXO). **I-2 Case C** (§9.4): the parent workflow transaction is **confirmed** on-chain but the PSBT spends a different `txid`/`vout` than the declared parent output — same code. |
+| `BTSL_ERR_13`  | `SCHEMA_MISMATCH`        | Checker shape predicates **S-1**/**S-2**: the number of PSBT inputs or outputs does not match the schema `INPUTS`/`OUTPUTS` count. Fast-fail — no per-field or algebraic predicates are evaluated afterward (§9.3.1). |
 
 ---
 
@@ -1070,8 +1077,7 @@ Compilation MAY proceed **only if** all mandatory sections (`VERSION`, `INPUTS`,
 | `BTSL_WARN_01`  | `UNKNOWN_SECTION`           | An unknown or reserved section was encountered and ignored during compilation.                          |
 | `BTSL_WARN_02`  | `NON_SEQUENTIAL_ASSERT`     | `ASSERT` indices are non-sequential (gaps detected). Execution proceeds in declared index order.        |
 | `BTSL_WARN_03`  | `UNTYPED_PARAM`             | A `@PARAM` was declared without a type annotation. Fallback to Flexible Mode.                           |
-| `BTSL_WARN_04` | `OP_RETURN_RELAY_RISK` | OP_RETURN payload exceeds 80 bytes.
-|                |                        | Nodes running Bitcoin Core ≤ v29 or Bitcoin. Knots may reject this transaction. Payload is valid under Bitcoin Core v30+ default policy.                                |
+| `BTSL_WARN_04`  | `OP_RETURN_RELAY_RISK`    | `OP_RETURN` payload exceeds 80 bytes. Nodes running Bitcoin Core ≤ v29 or Bitcoin Knots may reject this transaction; payload is valid under Bitcoin Core v30+ default policy. |
 | `BTSL_WARN_05`  | `KEY_PATH_ENABLED`          | A real (non-NUMS) key is used as `internal_key` in a `P2TR` script definition. Key-path spending is active. |
 | `BTSL_WARN_06`  | `MISSING_FEES_DECLARATION`  | No `calc` variable named `fees` was found. The implicit balance invariant check is skipped.             |
 | `BTSL_WARN_07`  | `EXCEEDS_STANDARD_WEIGHT`   | The computed `tx_weight` exceeds 400,000 wu. The transaction will likely be rejected by standard relay policy. |
@@ -1320,9 +1326,9 @@ PSBT_SCHEMA VAULT_UNLOCK:
 
 ---
 
-### 6.5. Single-Key Spend via `From()` (Pubkey Resolver)
+### 6.5. Single-Key Spend via `From()` (PUBKEY Resolver)
 
-*Demonstrates `From()` with mandatory `AS` alias, `Pubkey` param type,
+*Demonstrates `From()` with mandatory `AS` alias, `PUBKEY` param type,
 `NATIVE P2WPKH` declaration suppressing `BTSL_WARN_08`, and local `CONST:` scope.*
 
 ```bts
@@ -1337,7 +1343,7 @@ PSBT_SCHEMA PUBKEY_SPEND:
         AMOUNT = 10000
 
     PARAMS:
-        @PUBKEY:Pubkey
+        @PUBKEY:PUBKEY
         @FEE_RATE:FEERATE
 
     INPUTS:
@@ -1398,7 +1404,7 @@ pass these vectors to be considered compliant.
 | **ST-08** | `RESERVED` section present (`FOREACH`, `IMPORT`, `REQUIRED`) | Warned, ignored | `BTSL_WARN_01` |
 | **ST-09** | `From(@PUBKEY) AS alias` without `native_input_type` on the input | Binding succeeds, P2TR address inferred | `BTSL_WARN_08` |
 | **ST-10** | `From(@PUBKEY)` without `AS alias` clause | Rejected at parse time | `BTSL_ERR_00` |
-| **ST-11** | `From(@PARAM)` where `@PARAM` is not declared as `Pubkey` | Rejected at bind time | `BTSL_ERR_04e` |
+| **ST-11** | `From(@PARAM)` where `@PARAM` is not declared as `PUBKEY` | Rejected at bind time | `BTSL_ERR_04e` |
 
 ---
 
@@ -1416,7 +1422,7 @@ pass these vectors to be considered compliant.
 | **LG-08** | `OP_RETURN` payload 81 bytes                          | `BTSL_WARN_04` | Exceeds standard relay limit.                           |
 | **LG-09** | `tx_weight` > 400,000 wu                              | `BTSL_WARN_07` | Exceeds standard relay weight policy.                   |
 | **LG-10** | `@PARAM` reference without `PARAMS:` section          | `BTSL_ERR_04b` | Undeclared param.                                       |
-| **LG-11** | `From(@PUBKEY)` where the derived address has no confirmed UTXOs | `BTSL_ERR_09` | Resolver found no candidate UTXO for the given `Pubkey` (§4.5.4). |
+| **LG-11** | `From(@PUBKEY)` where the derived address has no confirmed UTXOs | `BTSL_ERR_09` | Resolver found no candidate UTXO for the given `PUBKEY` (§4.5.4). |
 
 ---
 
@@ -1444,6 +1450,20 @@ These vectors validate the canonical weight calculation (§3.5).
 
 > Implementations MUST produce these exact values. Deviations indicate an incorrect
 > weight model implementation.
+
+---
+
+### 7.5. Checker Verification Vectors
+
+These vectors apply to the **Checker** pipeline (§9.3, §9.3.1): PSBT + schema + parameters against chain truth. They are distinct from compiler-only parse/runtime vectors above.
+
+| ID        | Scenario | Expected | Predicate |
+| :-------- | :------- | :------- | :-------- |
+| **LG-12** | PSBT input `witness_utxo` / `non_witness_utxo` amount ≠ chain value for that outpoint | `BTSL_ERR_11` | **I-3** |
+| **LG-13** | PSBT input `txid`/`vout` ≠ outpoint bound in **Π** for that input (**I-2 Case A**) | `BTSL_ERR_12` | **I-2** |
+| **LG-14** | PSBT input `nSequence` ≠ schema `sequence:` (or inconsistent with **OP_CSV** per §9.5) | `BTSL_ERR_01` | **I-4** |
+| **LG-15** | PSBT output `scriptPubKey` ≠ script derived from schema for that output index | `BTSL_ERR_02` | **O-1** |
+| **LG-16** | `|PSBT inputs| ≠ |schema INPUTS|` (or outputs) — shape mismatch | `BTSL_ERR_13` | **S-1** / **S-2** |
 
 ---
 
@@ -1484,7 +1504,7 @@ These vectors validate the canonical weight calculation (§3.5).
 - [ ] `CHANGE` keyword: the `amount` argument MUST be a `calc` variable, not a literal.
 - [ ] `DUST_LIMIT` built-in constant = 546 sats (overridable via `CONST:`).
 - [ ] `NUMS_KEY` built-in constant = `0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0`.
-- [ ] `From()` UTXO resolver: `Pubkey` address derivation (P2TR default / `NATIVE` override), largest-first selection, mandatory `AS alias`, `alias.amount` in `calc`, `alias.address` in `OUTPUTS`. Raise `BTSL_ERR_09` if no confirmed UTXO found; emit `BTSL_WARN_08` if type inferred.
+- [ ] `From()` UTXO resolver: `PUBKEY` address derivation (P2TR default / `NATIVE` override), largest-first selection, mandatory `AS alias`, `alias.amount` in `calc`, `alias.address` in `OUTPUTS`. Raise `BTSL_ERR_09` if no confirmed UTXO found; emit `BTSL_WARN_08` if type inferred.
 - [ ] Witness nominal binding (P2TR paths with `witness:` only): each `witness_data` assignment MUST match exactly (case-sensitive, same order) the `witness_placeholder` names in the referenced path’s `witness:` block; raise `BTSL_ERR_10` on mismatch, missing entry, or order violation. Skip this check for P2WSH/P2SH unlocks without `witness:` placeholders.
 
 ### C. Security, Compliance & Errors
@@ -1494,8 +1514,10 @@ These vectors validate the canonical weight calculation (§3.5).
 - [ ] `nSequence` encoding for `sequence:` field per BIP68 (§9.5).
 - [ ] `<empty>` witness placeholder: pushes 0-byte item onto witness stack.
 - [ ] `PSBT_GLOBAL_UNKNOWN` namespace injection per §5.2.1 encoding spec.
-- [ ] Complete error table: `BTSL_ERR_00` through `BTSL_ERR_10` (including `04a`–`04e`).
+- [ ] Complete error table: `BTSL_ERR_00` through `BTSL_ERR_13` (including `04a`–`04e`).
 - [ ] Complete warning table: `BTSL_WARN_01` through `BTSL_WARN_09`.
+- [ ] **Checker (§9.3.1):** phases parse → shape (**S-1**/**S-2**, `BTSL_ERR_13` fast-fail) → field-level (**I-1…I-4**, **O-1**, **O-2**) → algebraic (**A-1…A-5**); `BTSL_ERR_11` for prevout amount vs chain; `BTSL_ERR_12` for **I-2 Case A** (params outpoint) and **I-2 Case C** (confirmed workflow parent vs PSBT outpoint); `BTSL_ERR_05` when the workflow parent is not yet available.
+- [ ] **Binding persistence (§9.1.1):** Level 1 semantic fields **MUST** be satisfied when exporting to an external Checker after `From()`; Level 2 dot-notation `.params` **SHOULD** for cross-vendor interchange.
 - [ ] RBF/CPFP recommendation: `nLocktime` on child transactions referencing `workflow_ref`.
 
 ---
@@ -1510,6 +1532,37 @@ for a fully auditable transaction:
 1. **PSBT** (BIP174/370) — the binary transaction object.
 2. **`.bts`** — the BTSL schema file (normative reference).
 3. **`.params`** — runtime binding file (UTF-8, `key=value`, one entry per line, `#` for comments).
+
+### 9.1.1. Binding persistence (`From()` and effective parameters)
+
+The Truth Triplet may carry **user-provided parameters only** (no persisted `From()` resolution) or **effective bindings** after the Maker has resolved `From(@PUBKEY) AS alias`. The Checker predicates **I-2** distinguish:
+
+- **Case A (strict outpoint):** bound parameters include the selected `txid`/`vout` for the input — the PSBT MUST match (`BTSL_ERR_12` on failure; §9.3.1).
+- **Case B (ownership only):** only “raw” user params — the Checker verifies ownership/type (**I-1**) and amounts (**I-3**), but does not require a specific outpoint beyond what the PSBT spends.
+
+For **multi-`PSBT_SCHEMA` workflows** (`DEPENDS_ON`, §9.4), the confirmed broadcast txid of each parent transaction **TXᵢ** MUST be present in the child schema's Truth Triplet. Without it, the Checker cannot apply **I-2 Case C** (§9.3.1) to verify that the child PSBT references the correct parent outpoints.
+
+**Level 1 — NORMATIVE (semantic).** When the Maker exports a PSBT to an **external** Checker, it **MUST** persist the result of each `From(@PUBKEY) AS alias` so the Checker can apply **I-2 Case A**, unless the deployment explicitly relies on Case B only. The **minimum data per alias** (semantic types; encoding of storage is not prescribed by the grammar) is:
+
+| Field | Requirement |
+| :---- | :---------- |
+| `alias.txid` | String of **64** hexadecimal characters, **lowercase** |
+| `alias.vout` | Non-negative integer |
+| `alias.amount` | Non-negative integer (satoshis) |
+| `alias.address` | String, valid Bitcoin address for the intended network |
+
+**Level 2 — RECOMMENDED (cross-vendor `.params` interop).** Implementations that exchange a `.params` **file** across vendors (e.g. desktop Maker ↔ hardware-wallet Checker) **SHOULD** emit and accept this dot-notation extension of the existing `key=value` line format:
+
+```
+{alias}.txid=<64 hex lowercase>
+{alias}.vout=<integer>
+{alias}.amount=<integer>
+{alias}.address=<address string>
+```
+
+**Level 3 — IMPLEMENTATION-DEFINED.** When Maker and Checker run in the **same process**, any internal transport (memory, IPC) **MAY** be used if Level&nbsp;1 semantics are satisfied at verification time.
+
+> **Anchor:** After `From()` selection, a Maker exporting to an external Checker **MUST** satisfy Level&nbsp;1 before handoff (see §4.5.7).
 
 ---
 
@@ -1527,17 +1580,71 @@ for a fully auditable transaction:
 
 ## 9.3. Audit & Signature Workflow (Checker Side)
 
+The numbered steps below summarize the Checker pipeline. **Normative phase order** (parse → shape → field-level → algebraic), predicate identifiers **S-1…A-5**, and error-code mapping are defined in **§9.3.1**.
+
 1. **Extraction:** `bitcoin-cli decodepsbt` → JSON, or equivalent library call.
 2. **Restoration (Anti-Fraud Step):** The Checker MUST ignore the `amount` declared
    in `witness_utxo` / `non_witness_utxo` fields by the coordinator. The actual
    on-chain value MUST be independently fetched (`prevout` query). **Strict validation
-   required: `PSBT_IN_VALUE == Blockchain_Value`. Any discrepancy is fatal.**
+   required: `PSBT_IN_VALUE == Blockchain_Value`.** Any discrepancy → `BTSL_ERR_11`
+   (`PREVOUT_VALUE_MISMATCH`). **Do not** map this case to `BTSL_ERR_06`.
 3. **Replay Mode:** Re-execution of `calc` using the live on-chain values obtained
    in step 2. Comparison of computed `calc` variables against PSBT output amounts.
 4. **Enforcement:** Full execution of `ASSERT` statements, followed by the implicit
-   balance check. Any failure → `BTSL_ERR_06`. Execution halts immediately.
+   balance check. Any failure in this step → `BTSL_ERR_06`. Execution halts immediately.
 5. **Signature:** Authorization granted only after the successful completion of steps
    2, 3, and 4. No partial signing is permitted.
+
+> **Normative ordering and full predicate set:** §9.3.1 defines Checker **phases** (parse → shape → field-level → algebraic), identifiers **S-1…A-5**, and **implementation freedom** (any strategy is compliant if all predicates hold).
+
+---
+
+### 9.3.1. Checker verification predicates (normative)
+
+For a PSBT **P**, schema **S**, parameters **Π**, with **chain truth** available for each input prevout (§9.3 step 2; predicate **I-3** and **calc** replay in step 3), a compliant Checker **MUST** evaluate the applicable predicates below in the prescribed phase order.
+**Implementation freedom:** any implementation that evaluates all applicable predicates correctly is compliant, regardless of internal architecture; the standard defines **what** to verify, not **how**.
+
+**Phase ordering**
+
+1. **Parse** — If **S** (the `.bts` file) is unparsable → `BTSL_ERR_00`.
+2. **Shape (fast-fail)** — **S-1:** `|P.inputs| == |S.INPUTS|`; **S-2:** `|P.outputs| == |S.OUTPUTS|`. If either fails → `BTSL_ERR_13`. The Checker **MUST NOT** continue to per-field or algebraic predicates after **S-1** or **S-2** fails.
+3. **Field-level** — For each input **i** and output **j**, predicates **I-1…I-4**, **O-1**, **O-2** (see below).
+4. **Algebraic** — **A-1…A-5** after certified input amounts and expected output values are established.
+
+**Shape**
+
+| ID | Rule | Error |
+| :--- | :--- | :--- |
+| **S-1** | Input count matches schema | `BTSL_ERR_13` |
+| **S-2** | Output count matches schema | `BTSL_ERR_13` |
+
+**Inputs** (for each input index **i**)
+
+| ID | Rule | Error |
+| :--- | :--- | :--- |
+| **I-1** | Spent UTXO `scriptPubKey` is derivable from the resolved input reference and declared type (`NATIVE` / `UNLOCK`). | `BTSL_ERR_01` / `BTSL_ERR_02` |
+| **I-2** | **Case A:** PSBT `txid`/`vout` equals **Π** for bound `@UTXO` or persisted `From()` outpoint (§9.1.1). **Case B:** `From()` only, raw **Π** — relaxed to **I-1** (no fixed outpoint). **Case C:** workflow input — equals confirmed parent broadcast outpoint (§9.4); unbroadcast parent → `BTSL_ERR_05`; broadcast parent with outpoint mismatch → `BTSL_ERR_12`. | `BTSL_ERR_12` (Case A; Case C broadcast mismatch) / `BTSL_ERR_05` (Case C unbroadcast) |
+| **I-3** | PSBT-declared input value equals independent chain value for that outpoint. | `BTSL_ERR_11` |
+| **I-4** | If the schema declares `sequence:` for **i**, PSBT `nSequence` matches and remains consistent with **OP_CSV** in **asm:** (§9.5). | `BTSL_ERR_01` |
+
+**Outputs** (for each output index **j**)
+
+| ID | Rule | Error |
+| :--- | :--- | :--- |
+| **O-1** | PSBT output `scriptPubKey` matches the script derived from **S.OUTPUTS[j]** (address/`CHANGE`, `SCRIPT`, or `OP_RETURN`). | `BTSL_ERR_02` |
+| **O-2** | Output value equals value expected from **calc** / schema (or **0** for `OP_RETURN`). | `BTSL_ERR_06` |
+
+**Algebraic**
+
+| ID | Rule | Error / warning |
+| :--- | :--- | :--- |
+| **A-1** | Replay **calc** using **Π** and **chain-certified** input amounts (not PSBT), and canonical **vSize** (§3.5). | `BTSL_ERR_08` |
+| **A-2** | Evaluate all **ASSERT** lines in index order; no partial evaluation. | `BTSL_ERR_06` |
+| **A-3** | If `fees` exists in **calc:** `SUM(certified inputs) == SUM(PSBT output values) + fees`. If `fees` absent → `BTSL_WARN_06`. | `BTSL_ERR_06` / `BTSL_WARN_06` |
+| **A-4** | Non-`OP_RETURN` outputs ≥ `DUST_LIMIT`. | `BTSL_ERR_07` |
+| **A-5** | If **tx_weight** > 400,000 wu → `BTSL_WARN_07`. | `BTSL_WARN_07` |
+
+Cross-references: grammar §2; weight §3.5; **calc** / **ASSERT** §4.3; **From()** §4.5; **Truth Triplet** §9.1–§9.1.1; **REF()** / chain values §4.2.
 
 ---
 
@@ -1548,6 +1655,10 @@ for a fully auditable transaction:
 - Chain integrity check:
   `PSBT_IN_PREV_TXID == REF(SCHEMA:idx.txid)` AND
   `PSBT_IN_PREV_VOUT == REF(SCHEMA:idx.vout)`
+  If this check fails → `BTSL_ERR_12` (`OUTPOINT_MISMATCH`).
+  `BTSL_ERR_05` applies when the parent has **not yet been broadcast**;
+  `BTSL_ERR_12` applies when the parent **is confirmed** but the PSBT
+  outpoint does not match its txid.
 - Circular dependency detection: if `A DEPENDS_ON B` and `B DEPENDS_ON A` →
   `BTSL_ERR_03` immediately at the `OPTIONS` parse phase.
 
@@ -1586,7 +1697,9 @@ operand in the associated `asm:` block. If they differ, the compiler MUST raise
 
 ---
 
-## 9.7. [OPEN] Future Work: Offline Audit & SPV Proofs (Air-Gapped Zero-Trust)
+## 9.7. Future Work *(Informative)* — Offline Audit & SPV Proofs (Air-Gapped Zero-Trust)
+
+This section is **non-normative**: it does not constrain v1.0 implementations.
 
 Currently, the audit protocol (§9.3, step 2) requires an active connection to an
 on-chain indexer to validate the `Blockchain_Value` of a UTXO. This constrains strict

@@ -34,6 +34,6 @@ Each subfolder contains:
 
 - `single-key-from-pubkey/`
   - **Schema:** §6.5 `PUBKEY_SPEND` — single-key spend via `From(@PUBKEY) AS alias`.
-  - **Focus:** `Pubkey` parameter type, `From()` resolver semantics, `alias.amount` in `calc`,
+  - **Focus:** `PUBKEY` parameter type, `From()` resolver semantics, `alias.amount` in `calc`,
     `alias.address` in `OUTPUTS`, interaction with `native_input_type`.
 
