@@ -10,9 +10,6 @@
 
 ---
 
-> This document represents the state of the original author's work, who
-> is no longer available to maintain it. It is published as-is in the
-> hope that it can be continued by the community.
 > Non-normative future-work material is labeled **(Informative)** (§9.7).
 > Errata and proposed changes should be tracked via the project repository (issues / pull requests).
 
