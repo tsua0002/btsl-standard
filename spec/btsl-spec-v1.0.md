@@ -322,7 +322,7 @@ output_line         ::= INTEGER, COLON, output_type
 (* Normative Positional Rule for output_type:                        *)
 (* The parser reads a single line left-to-right:                     *)
 (*   position 1 → address_ref (exactly one syntactic unit)           *)
-(*   position 2 → amount value (INTEGER | snake_case_id | IDENTIFIER)*)
+(*   position 2 → amount value (INTEGER | snake_case_id | IDENTIFIER | compile_ref)*)
 (*   position 3 → optional unit suffix — absent means sats          *)
 (* A bare snake_case_id at position 1 is ONLY valid as address_ref   *)
 (* if immediately followed by "." (i.e., it is an alias_ref).        *)
@@ -338,8 +338,11 @@ output_type         ::= (address_ref, amount)
 
 amount              ::= (INTEGER, [ ("sats" | "btc") ])
                       | ((snake_case_id | IDENTIFIER), [ ("sats" | "btc") ])
+                      | (compile_ref, [ ("sats" | "btc") ])
 
 (* unit absent → sats. Normative default, enforced at parse time.    *)
+(* compile_ref as amount: resolved at Binding (§3.4); MUST yield a   *)
+(* non-negative SAT integer (e.g. @PARAM typed SATOSHI or SAT).     *)
 
 (* address_ref: exactly one syntactic unit. snake_case_id only valid *)
 (* as part of alias_ref (requires "." suffix). Bare snake_case_id    *)
